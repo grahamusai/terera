@@ -6,24 +6,30 @@
 import { NextResponse } from 'next/server';
 import { getSpotifyConfig, validateSpotifyConfig } from '../../../../../lib/config/spotify.js';
 
-export async function POST(request) {
+export async function GET(request) {
   try {
     // Validate server-side configuration
     validateSpotifyConfig();
     
-    const body = await request.json();
-    const { code, state, error } = body;
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const error = searchParams.get('error');
 
     // Handle OAuth errors
     if (error) {
       console.error('Spotify OAuth error:', error);
-      return NextResponse.json({ error }, { status: 400 });
+      return NextResponse.redirect(
+        new URL(`/?error=${encodeURIComponent(error)}`, request.url)
+      );
     }
 
     // Validate required parameters
     if (!code || !state) {
       console.error('Missing code or state parameter');
-      return NextResponse.json({ error: 'missing_parameters' }, { status: 400 });
+      return NextResponse.redirect(
+        new URL('/?error=missing_parameters', request.url)
+      );
     }
 
     // For now, we'll skip PKCE validation in the server-side callback
@@ -53,13 +59,15 @@ export async function POST(request) {
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text();
       console.error('Token exchange failed:', errorData);
-      return NextResponse.json({ error: 'token_exchange_failed' }, { status: 400 });
+      return NextResponse.redirect(
+        new URL('/?error=token_exchange_failed', request.url)
+      );
     }
 
     const tokenData = await tokenResponse.json();
 
-    // Create successful response
-    const response = NextResponse.json({ success: true });
+    // Create response with redirect to home page
+    const response = NextResponse.redirect(new URL('/', request.url));
 
     // Set secure HTTP-only cookies for tokens
     response.cookies.set('spotify_access_token', tokenData.access_token, {
@@ -82,6 +90,8 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Callback handler error:', error);
-    return NextResponse.json({ error: 'callback_handler_error' }, { status: 500 });
+    return NextResponse.redirect(
+      new URL('/?error=callback_handler_error', request.url)
+    );
   }
 }

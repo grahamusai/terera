@@ -85,21 +85,18 @@ export function SpotifyAuthProvider({ children }) {
   const checkAuthStatus = useCallback(async () => {
     try {
       setIsLoading(true);
-      const authenticated = spotifyApi.isAuthenticated();
+      const authenticated = await spotifyApi.isAuthenticated();
       setIsAuthenticated(authenticated);
       
       if (authenticated) {
-        const token = spotifyApi.getAccessToken();
-        setAccessToken(token);
-        
         // Try to get user profile to verify token is still valid
         try {
           const userProfile = await spotifyApi.getCurrentUser();
           setUser(userProfile);
         } catch (error) {
           console.error('Failed to get user profile:', error);
-          // Token might be expired, try to refresh
-          await refreshToken();
+          setIsAuthenticated(false);
+          setUser(null);
         }
       }
     } catch (error) {

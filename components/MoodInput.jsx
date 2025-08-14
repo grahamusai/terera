@@ -95,37 +95,22 @@ export default function MoodInput({ onRecommendations, onError, onLoadingChange 
     try {
       setIsLoading(true)
       
-      // Analyze mood to get audio features
-      const moodAnalysis = MoodAnalysisService.mapMoodToAudioFeatures(mood)
+      // Use the new recommendation service
+      const { recommendationService } = await import('../lib/services/recommendationService.js')
+      const result = await recommendationService.getRecommendationsByMood(mood, { limit: 20 })
       
-      // Prepare recommendation parameters
-      const recommendationParams = {
-        limit: 20,
-        target_valence: moodAnalysis.audioFeatures.valence,
-        target_energy: moodAnalysis.audioFeatures.energy,
-        target_danceability: moodAnalysis.audioFeatures.danceability,
-        target_acousticness: moodAnalysis.audioFeatures.acousticness,
-        target_instrumentalness: moodAnalysis.audioFeatures.instrumentalness,
-        min_tempo: Math.max(60, moodAnalysis.audioFeatures.tempo - 20),
-        max_tempo: Math.min(200, moodAnalysis.audioFeatures.tempo + 20)
-      }
-
-      // Get track recommendations
-      const trackRecommendations = await spotifyApi.getRecommendations(recommendationParams)
-      
-      // Search for albums based on mood
-      const albumSearchResults = await spotifyApi.search(
-        moodAnalysis.searchTerms.join(' '), 
-        ['album'], 
-        10
-      )
-
+      // Format the results for the existing interface
       const recommendations = {
-        tracks: trackRecommendations.tracks || [],
-        albums: albumSearchResults.albums?.items || [],
-        mood: moodAnalysis.primaryEmotion,
-        intensity: moodAnalysis.intensity,
-        audioFeatures: moodAnalysis.audioFeatures
+        tracks: [
+          ...(result.recommendations.tracks || []),
+          ...(result.searchResults.tracks || [])
+        ],
+        albums: [
+          ...(result.recommendations.albums || []),
+          ...(result.searchResults.albums || [])
+        ],
+        mood: result.mood,
+        audioFeatures: result.audioFeatures
       }
 
       if (onRecommendations) {
